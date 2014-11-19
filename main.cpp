@@ -7,30 +7,39 @@
 //
 
 #include <iostream>
-//#include <time.h>
 #include <opencv/highgui.h>
 #include <opencv/cv.h>
 #include <opencv2/opencv.hpp>
+#include <sys/time.h>
+#include <time.h>
+#include <vector>
 
 using namespace cv;
 using namespace std;
 
-void    HandDetection();
-int     LaunchDefCam();
-int     LaunchUsbCam();
-int     CaptureCam();
-string  InttoString(int iInput);
+void           HandDetection();
+int            LaunchDefCam();
+int            LaunchUsbCam();
+int            CaptureCam();
+void           MatOutTest(unsigned long iTime);
+unsigned long  searchApproximateFrame(unsigned long input, vector <unsigned long> &arr, int n);
 
+
+string  InttoString(int iInput);
+string  UlongtoString(unsigned long ulInput);
+
+vector<unsigned long>  vecTime;
 
 int main(int argc, const char * argv[]) {
     // insert code here...
-
 
 //    LaunchDefCam();
 //    LaunchUsbCam();
 
 //    HandDetection();
+    unsigned long ulTest = 1416331626929;
     CaptureCam();
+    MatOutTest(ulTest);
 
     return 0;
 }
@@ -133,14 +142,13 @@ int LaunchUsbCam()
 
 int CaptureCam()
 {
-  int iFrame = 0;
-  string stPre = "./";
-  string stSuf = ".xml";
-  string stSum;
+  string stPre = "Frame";
+  string stSum, stTime;
 
-  const time_t t = time(NULL);
+  struct timeval  tm;
+  unsigned long   ms;
 
-  VideoCapture vcTest(0);
+  VideoCapture vcTest(1);
 
   if(!vcTest.isOpened()){
 
@@ -151,20 +159,24 @@ int CaptureCam()
 
   bool stop = false;
 
+  FileStorage fs("/u5/j49zheng/Work/monika-cv/Framee.xml", FileStorage::WRITE);
   while(!stop){
-      cout << "current time is" << t << endl;
+
+      gettimeofday(&tm, NULL);
+      ms = tm.tv_sec * 1000 + tm.tv_usec / 1000;
+      stTime = UlongtoString(ms);
+      vecTime.push_back(ms);
 
       vcTest>>matFrame;
 
       imshow("CamTest", matFrame);
 
-      stSum = stPre + InttoString(iFrame) + stSuf;
+      stSum = stPre + stTime;
 
-      cout << stSum << endl;
+//      FileStorage fs("/u5/j49zheng/Work/monika-cv/Framee.xml", FileStorage::WRITE);
+      fs << stSum << matFrame;
 
-      FileStorage fs(stSum, FileStorage::WRITE);
-//      fs << InttoString(iFrame) << matFrame;
-      iFrame++;
+      cout << matFrame.cols << endl;
 
       if(waitKey(30) >= 0){
           stop = true;
@@ -173,15 +185,36 @@ int CaptureCam()
         }
   }
 
-  FileStorage fs("./frame.xml", FileStorage::READ);
-  Mat matFrameOut;
-  fs["frame"] >> matFrameOut;
-
-  imshow("outPut", matFrameOut);
-
   return 0;
 
 }   // end of CaptureCam()
+
+void MatOutTest(unsigned long ulTime)
+{
+    Mat matImageOut;
+    string strFile, strImage;
+    unsigned long ulExactTime;
+
+    ulExactTime = searchApproximateFrame(ulTime, vecTime, vecTime.size());
+
+    cout << ulExactTime << endl;
+
+    FileStorage fs("/u5/j49zheng/Work/monika-cv/Framee.xml", FileStorage::READ);
+
+    strFile = "Frame" + UlongtoString(ulExactTime);
+
+    cout << strFile << endl;
+
+    fs[strFile] >> matImageOut;
+    strImage = strFile + ".jpg";
+    imwrite(strImage, matImageOut);
+
+    cout << matImageOut.cols << endl;
+
+    fs.release();
+    vecTime.clear();
+
+}   // end of MatOutTest()
 
 string InttoString(int iInput)
 {
@@ -191,4 +224,32 @@ string InttoString(int iInput)
 
   return stOutput;
 
+}
+
+string UlongtoString(unsigned long ulInput)
+{
+  stringstream ss;
+  ss << ulInput;
+  string stOutput = ss.str();
+
+  return stOutput;
+
+}
+
+unsigned long searchApproximateFrame(unsigned long input, vector <unsigned long> &arr, int n)
+{
+  int l, r, m;
+  l = 0;
+  r = n - 1;
+  while(l <= r) {
+    m = (l + r) >> 1;
+    if (arr[m] > input) {
+      r = m - 1;
+    } else if (arr[m] < input) {
+      l = m + 1;
+    } else {
+      break;
+    }
+  }
+  return arr[m];
 }
